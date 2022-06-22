@@ -1,0 +1,343 @@
+### Stats with R Exercise sheet 4
+
+##########################
+# Week 5: t-test and friends
+##########################
+
+
+## This exercise sheet contains the exercises that you will need to complete and 
+## submit by 23:55 on Sunday, November 28. Write the code below the questions. 
+## If you need to provide a written answer, comment this out using a hashtag (#). 
+## Submit your homework via cms
+
+## Please write below your (and your teammates') name, matriculation number. 
+## Name: Mark Sebastian Mikleu, George Daniel Mikleu, Mahima Mahabaleshwar Acharya
+## Matriculation number: 2580499, 2580498, 7003016
+## Team: 56
+
+
+###########################################################################################
+###########################################################################################
+
+#####################################################
+### 1. Restructuring, plotting, and t tests
+#####################################################
+
+library(lsr)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(languageR)
+
+## We will be working with the dataset lexdec from the package languageR
+## In short, this data set contains reaction times from an experiment, where participants had 
+## to decide whether something is a word or not (nonword). Only responses for real words are
+## included and there were 79 measurements per participant.
+## 
+## Variables we will be interested in include 
+## Subject (code for a participant)
+## NativeLanguage (native language of participant)
+## RT (log reaction time)
+## Sex (of the participant)
+## PrevType (whether the preceding word was a real word or a nonword)
+## Class (whether the target word was denoting an animal or a plant)
+
+
+## 1. Create the dataset lexdat, which is a copy of lexdec, but only includes the columns 
+##  indicated above
+
+lexdat <- select(lexdec,c(Subject,NativeLanguage,RT,Sex,PrevType,Class))
+
+## Say you are interested in the influence of the previous word type on lexical decision time.
+## Before we start testing, we want to get an impression of the data and create a barplot of 
+## the mean by prevType, including error bars that show the 95% CI.
+## Here, we define a function to calculate the standard error, which is needed for the CI.
+## (just execute the next line, as you will need the function in 2.)
+se = function(x){sd(x)/sqrt(length(x))}
+
+## 2. To start, we need to summarize the data. Use the functions group_by() in combination with
+##  summarise(). In particular, you need to group by prevType and get the mean as well as the
+##  se of RT. Store the result to summaryByPrevType
+##  You will find examples of how the summarizing can be done here:
+##  https://datacarpentry.org/R-genomics/04-dplyr.html#split-apply-combine_data_analysis_and_the_summarize()_function
+
+
+summaryByPrevType <- lexdat %>%
+  group_by(PrevType) %>%
+  summarize(mean = mean(RT), se = se(RT))
+
+summaryByPrevType
+
+## 3. Describe the resulting data set (summaryByPrevType) in your own words
+
+# It is a table with two rows.
+# The first row has the mean and the standard error of the reaction time of all non words.
+# The second row has the mean and the standard error of the reaction time of all words
+
+## 4. Now use summaryByPrevType to create the barplot with error bars denoting the 95% CI
+##  (i.e. mean +/-1.96 * se)
+
+ggplot(summaryByPrevType, aes(x = PrevType, y = mean)) +
+  geom_bar(stat="identity") +
+  geom_errorbar(aes(ymin = mean - 1.96 * se, ymax = mean + 1.96 * se))
+
+
+## 5. The barplot always starts at zero, which makes the portion of the graph, we are most 
+##  interested in (i.e. the spread of the error bars) hard to perceive. As an alternative,
+##  construct a line plot of the same data, again including error bars.
+##  Hint: if you get a complaint, try to add group = 1 to your aes
+
+ggplot(summaryByPrevType, aes(x = PrevType, y = mean,  group = 1)) +
+  geom_line() +
+  geom_point() +
+  geom_errorbar(aes(ymin = mean - 1.96 * se, ymax = mean + 1.96 * se), width = 0.1)
+
+## 6. Gauging from the plot, does it look like there's an important difference in mean RT 
+##  after words compared to nonwords?
+
+# It looks like there is a significant difference between the two means.
+# The error bars are far away from each other.
+
+## 7. Let's go back to the original data frame "lexdat".
+##  Now that you've taken a look at the data, you want to get into the stats.
+##  You want to compute a t-test for the average RT after words vs nonwords.
+##  Why can't you compute a t-test on the data as they are now? 
+##  Hint: Which assumption is violated?
+
+# The independence assumption is violated because we measure the same subjects 79 times.
+# The normality assumption might be also violated because the data is positively skewed
+# as seen in the following exercises.
+
+## 8. We need to restructure the data to only one observation (average RT) per subject 
+##  and word/nonword condition (PrevType). We will again use group_by and summarize, but
+##  this time we have to group by Subject and PrevType, while we only need the mean to be 
+##  stored, not the se. Assign the result to bySubj
+
+bySubj <- lexdat %>%
+  group_by(Subject, PrevType) %>%
+  summarize(mean = mean(RT))
+
+bySubj
+
+## 9. Create histograms of the RT data in bySubj depending on the preceding word 
+##  type and display them side by side. Set the binwidth to 0.08
+
+ggplot(bySubj, aes(x = mean, fill = PrevType)) +
+  geom_histogram(binwidth = 0.08, position = "dodge")
+
+## 10. Display the same data in density plots.
+
+ggplot(bySubj, aes(x = mean)) +
+  geom_density(aes(color = PrevType))
+
+## 11. Based on the histograms and the density plots - are these data normally 
+##  distributed?
+
+# No, the data seems to be positively skewed.
+
+## 12. Create boxplots of the mean RT in bySubj by PrevType
+
+ggplot(bySubj, aes(x = mean, fill = PrevType)) +
+  geom_boxplot()
+
+## 13. Compute the t-test to compare the mean RT between decisions following on a word
+##  vs a nonword using the data in bySubj.
+##  Do you need a paired t-test or independent sample t-test? why?
+
+# We need a paired t test because we measure the subject twice (word, nonword)
+word <- bySubj %>% 
+  filter(PrevType == "word")
+
+nonword <- bySubj %>% 
+  filter(PrevType == "nonword")
+
+t.test(nonword$mean, word$mean, paired = TRUE)
+
+## 14. What does the output tell you? What conclusions do you draw?
+###!!! too generic
+# The p value is smaller than 0,05 from which we conclude that we can reject the null hypothesis.
+
+## 15. In addition to the long-format data we've just been working on, you may also 
+## encounter data sets in a wide format (this is the format we have been using in 
+## class examples.)
+## Let's look at a different variable, namely the semantic class (Class) of the target 
+## word instead of the type of the previous word. Again, summarize the dataset
+## to obtain the mean RT by subject and class and transform the dataset to a 
+## wide format. In addition to group_by() and summarize(), you will need the function 
+## spread(). Assign the result to wide
+
+byClass <- lexdat %>%
+  group_by(Subject, Class) %>%
+  summarize(mean = mean(RT))
+
+byClass
+
+wide <- spread(byClass, Class, mean)
+wide
+
+## 16. Compute a t-test on the wide format data - note that for wide-format 
+##  data you need to use a different syntax inside t.test()
+
+t.test(wide$animal, wide$plant, paired = TRUE)
+
+## 17. What do you conclude from this?
+###!!! again, too
+# The p value is larger than 0,05 and thus we don't reject the null hypothesis.
+
+## 18. Now let's look at yet another question, namely whether the native language 
+##  of the participant influences their reaction time. Check out the variable
+##  NativeLanguage. Can you use a t-test to pursue this question and which type
+##  of t-test would you use? Can you think of a situation, where a t-test would not 
+##  be enough to test for a difference depending on the native language?
+
+table(lexdat$NativeLanguage)
+# We can use a welch test because there are two sample that are independent
+# (only one possible native language) but their variance isn't the same.
+# A t-test wouldn't be enough if we would have more than two native languages.
+
+## 19. Use again group_by and summarize to obtain by subject means of RT, but
+## this time with regard to NativeLanguage and assign it to bySubjNatLang
+## Perform the t-test you decided for.
+
+bySubjNatLang <- lexdat %>%
+  group_by(Subject, NativeLanguage) %>%
+  summarize(mean = mean(RT))
+
+bySubjNatLang
+
+English <- bySubjNatLang %>% 
+  filter(NativeLanguage == "English")
+
+Other <- bySubjNatLang %>% 
+  filter(NativeLanguage == "Other")
+
+t.test(English$mean, Other$mean)
+
+
+## 20. What do you conclude?
+###!!! too generic:
+# The p value is smaller than 0,05 from which we conclude that we can reject the null hypothesis.
+
+## 21. Compute the effect size using Cohen's D.
+
+cohensD(formula = mean ~ NativeLanguage, data = bySubjNatLang, method = "unequal")
+
+## 22.  Which effect size do we get? How do you interpret this result?
+###!!! elaborate:
+# The effect size is 1.08622.
+# This means that there is a large effect.
+
+## 23. Choose an appropriate plot to visualize the difference between group
+
+ggplot(bySubjNatLang, aes(x = mean, fill = NativeLanguage)) +
+  geom_boxplot()
+
+###############
+### 2. T-Test
+###############
+## In this exercise we will try to explore the independent samples t-test 
+## and its affect on different samples. 
+## We will take the same example discussed in the lecture. A class has two tutors, and we want 
+## to find out which tutor is better by comparing the performance of the students in the final 
+## exam by tutor group. First set a seed to make sure your results can be reproduced
+
+set.seed(8254)
+## 1. Generate 15 samples from a normal distribution with mean 20 and sd 8 and save it in a variable 
+##  called "tutor1_grades"
+
+tutor1_grades <- rnorm(15, mean = 20, sd = 8)
+
+## 2. Now we generate our second sample of size 15, this time for tutor 2 and with mean 35 and 
+## sd 15
+
+tutor2_grades <- rnorm(15, mean = 35, sd = 15)
+
+## 3. Combine the two samples and store the result into one vector called "score" (it should 
+##    first show all scores from tutor1 followed by the scores of tutor2)
+
+score <- c(tutor1_grades, tutor2_grades)
+
+
+## 4. Create a vector called tutor indicating which tutor the score belongs to: it should show 
+##   "tutor1" 15 times followed by "tutor2" 15 times
+
+tutor <- rep(c("tutor1", "tutor2"), times = c(15,15))
+tutor <- factor(tutor)
+
+## 5. Create a data frame named "data_frame" having 2 columns "tutor", "score" created above.
+
+data_frame <- data.frame(tutor,score)
+
+## 6. Run the independent samples TTest (independentSamplesTTest()) and formulate the findings as discussed 
+###  in the lecture. 
+##	independentSamplesTTest() also provides the effect size (Cohen's d). How do you interpret the effect size?
+
+independentSamplesTTest(formula = score ~ tutor, data = data_frame)
+
+
+# The mean score in tutor 1 class was 18.054 % (std dev.  5.514),
+# whereas the mean in tutor 2 class was 38.532 % (std dev. 13.490)
+# A welch test showed that the difference is significant.
+# (t(18.552) = -5,442, p < 0,05, CI95 = [-28.367, -12.589], d = 1.987)
+
+# From the p-value we know that the difference between the means is not random but significant.
+# The Cohen's d gives us a measurement to see how large the difference between the means is.
+# Here with Cohen's d = 1.987 we know that the difference is large (almost 2 standard deviations).
+
+
+## 7. Time to play around!
+##	repeat the whole experiment you performed above with different sample size, mean and standard deviation  
+##	repeat it 3 times changing all the values (sample size, mean, sd) and formulate the findings.  
+##	what do you observe when we keep the means and sd same?
+
+tutor1_grades <- rnorm(30, mean = 18, sd = 7)
+tutor2_grades <- rnorm(30, mean = 18, sd = 7)
+score <- c(tutor1_grades, tutor2_grades)
+
+tutor <- rep(c("tutor1", "tutor2"), times = c(30,30))
+tutor <- factor(tutor)
+
+data_frame <- data.frame(tutor,score)
+
+independentSamplesTTest(formula = score ~ tutor, data = data_frame, var.equal = TRUE)
+
+# The mean grade in tutor 1 class was 19.836 % (std dev.  6.974),
+# whereas the mean in tutor 2 class was 17.620 % (std dev. 6.376)
+# A Student's independent sample t-test showed that the difference is not significant.
+# (t(58) = 1.284, p > 0,05, CI95 = [-1.238, 5.669], d = 0.332)
+
+tutor1_grades <- rnorm(50, mean = 22, sd = 5)
+tutor2_grades <- rnorm(80, mean = 22, sd = 5)
+score <- c(tutor1_grades, tutor2_grades)
+
+tutor <- rep(c("tutor1", "tutor2"), times = c(50,80))
+tutor <- factor(tutor)
+
+data_frame <- data.frame(tutor,score)
+
+independentSamplesTTest(formula = score ~ tutor, data = data_frame, var.equal = TRUE)
+
+# The mean grade in tutor 1 class was 21.732 % (std dev.  4.293),
+# whereas the mean in tutor 2 class was 21.931 % (std dev. 5.222)
+# A Student's independent sample t-test showed that the difference is not significant.
+# (t(128) = -0.225, p > 0,05, CI95 = [-1.942, 1.545], d = 0.041)
+
+tutor1_grades <- rnorm(35, mean = 18, sd = 12)
+tutor2_grades <- rnorm(35, mean = 80, sd = 10)
+score <- c(tutor1_grades, tutor2_grades)
+
+tutor <- rep(c("tutor1", "tutor2"), times = c(35,35))
+tutor <- factor(tutor)
+
+data_frame <- data.frame(tutor,score)
+
+independentSamplesTTest(formula = score ~ tutor, data = data_frame)
+
+# The mean grade in tutor 1 class was 16.535 % (std dev.  10.861),
+# whereas the mean in tutor 2 class was 82.773 % (std dev. 9.638)
+# A welch test showed that the difference is significant.
+# (t(67.052) = -26.988, p < 0,05, CI95 = [-71.137, -61.339], d = 6.451)
+
+# When the means and sd are kept the same, we observe a high p-value and a low Cohen's d.
+# On the other hand if they are not the same, p-value becomes lower, while the Cohen's d increases.
+
