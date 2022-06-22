@@ -1,0 +1,329 @@
+### Stats with R Exercise sheet 10
+
+####################################################
+# Week 11: Model Selection, Transformations, Power
+####################################################
+
+## This exercise sheet contains the exercises that you will need to complete and 
+## submit by 23:55 on Sunday, January 23. Write the code below the questions. 
+## If you need to provide a written answer, comment this out using a hashtag (#). 
+## Submit your homework via cms
+
+## Please write below your (and your teammates) name, matriculation number. 
+## Name: Mark Sebastian Mikleu, George Daniel Mikleu, Mahima Mahabaleshwar Acharya
+## Matriculation number: 2580499, 2580498, 7003016
+## Team: 56
+
+###############################################################################
+###############################################################################
+
+# The following line of code clears your workspace.
+
+rm(list = ls())
+
+
+#########################################################################
+### Exercise 1  Simplifying random effect structures
+#########################################################################
+
+library(lme4)
+library(languageR)
+
+##  Using the lexdec data set again, you want to fit the model that tests for effects of Frequency, the type of the 
+##  previous Word and the native language of the participant:
+
+
+m = lmer(RT ~ PrevType+  Frequency+ NativeLanguage+(PrevType+Frequency|Subject) + (PrevType+NativeLanguage| Word), lexdec, REML=F)
+
+## a) Unfortunately, the maximal model given above gives a warning that indicates that the model is too complex for the data.
+##  In order to get a model that converges without warnings, try to use backwards selection on the random effects. 
+##  First exclude the random effect that is least contributing to the model fit and so on (this may require multiple 
+##  steps and a large number of fitted models!). Use model comparison to decide which effects
+##  can be excluded.
+##  You may exclude random effects only, if they don't contribute significantly with alpha set to 0.1
+
+###!!! wrong, you do not choose the model to exclude correctly:
+
+m2 <- lmer(RT ~ PrevType+  Frequency+ NativeLanguage+ (PrevType+NativeLanguage| Word), lexdec, REML=F)
+anova(m2,m) # (PrevType+Frequency|Subject) is significant (p-value < 0.01, difference in deviance 677.6) and thus can't be removed.
+m3 <- lmer(RT ~ PrevType+  Frequency+ NativeLanguage+(PrevType+Frequency|Subject), lexdec, REML=F)
+anova(m3,m) # (PrevType+NativeLanguage| Word) is significant (p-value < 0.01, difference in deviance 63.149) and thus can't be removed.
+
+m4_1 <- lmer(RT ~ PrevType+  Frequency+ NativeLanguage+(Frequency|Subject) + (PrevType+NativeLanguage| Word), lexdec, REML=F)
+anova(m4_1,m) # not significant, deviance = -1015.0
+m4_2 <- lmer(RT ~ PrevType+  Frequency+ NativeLanguage+(PrevType|Subject) + (PrevType+NativeLanguage| Word), lexdec, REML=F)
+anova(m4_2,m) # significant
+m4_3 <- lmer(RT ~ PrevType+  Frequency+ NativeLanguage+(PrevType+Frequency|Subject) + (NativeLanguage| Word), lexdec, REML=F)
+anova(m4_3,m) # not significant, deviance = -1038.4
+m4_4 <- lmer(RT ~ PrevType+  Frequency+ NativeLanguage+(PrevType+Frequency|Subject) + (PrevType| Word), lexdec, REML=F)
+anova(m4_4,m) # not significant, deviance = -1031.3
+
+# We exclude PrevType from (PrevType+Frequency|Subject) because it is least contributing to the model fit.
+
+m <- m4_1 # new base model
+
+m4_1 <- lmer(RT ~ PrevType+  Frequency+ NativeLanguage+(1|Subject) + (PrevType+NativeLanguage| Word), lexdec, REML=F)
+anova(m4_1,m) # not significant, deviance = -1020.2
+m4_2 <- lmer(RT ~ PrevType+  Frequency+ NativeLanguage+(Frequency|Subject) + (NativeLanguage| Word), lexdec, REML=F)
+anova(m4_2,m) # significant
+m4_3 <- lmer(RT ~ PrevType+  Frequency+ NativeLanguage+(Frequency|Subject) + (PrevType| Word), lexdec, REML=F)
+anova(m4_3,m) # not significant, deviance = -1027.7
+
+# We exclude Frequency from (Frequency|Subject) because it is least contributing to the model fit.
+
+m <- m4_1 # new base model
+
+m4_1 <- lmer(RT ~ PrevType+  Frequency+ NativeLanguage + (PrevType+NativeLanguage| Word), lexdec, REML=F)
+anova(m4_1,m) # significant
+m4_2 <- lmer(RT ~ PrevType+  Frequency+ NativeLanguage+(1|Subject) + (NativeLanguage| Word), lexdec, REML=F)
+anova(m4_2,m) # not significant, deviance = -1014.6
+m4_3 <- lmer(RT ~ PrevType+  Frequency+ NativeLanguage+(1|Subject) + (PrevType| Word), lexdec, REML=F)
+anova(m4_3,m) # significant
+
+# We exclude PrevType from (PrevType+NativeLanguage| Word) because it is least contributing to the model fit.
+
+m <- m4_2 # new base model
+
+m4_2 <- lmer(RT ~ PrevType+  Frequency+ NativeLanguage+(1|Subject) + (1| Word), lexdec, REML=F)
+anova(m4_2,m) # significant
+
+# We can't exclude Nativelanguage from (NativeLanguage| Word) because it is significant.
+# We now try to remove the predictors that don't appear in the random effects.
+
+m4_1 <- lmer(RT ~ Frequency+ NativeLanguage+(1|Subject) + (NativeLanguage| Word), lexdec, REML=F)
+anova(m4_1,m) # significant
+m4_2 <- lmer(RT ~ PrevType+NativeLanguage+(1|Subject) + (NativeLanguage| Word), lexdec, REML=F)
+anova(m4_2,m) # significant
+
+# Both predictors (PrevType, Frequency) are significant and thus can't be removed.
+
+# Our shortened model is: RT ~ PrevType + Frequency + NativeLanguage + (1 | Subject) + (NativeLanguage | Word)
+
+## b) Comment on your result in a): were you able to produce a suitable model without convergence problems?
+
+# Our by backwards selection created model doesn't have any convergence problems (no warning)
+# but there were warnings in some of the steps of the backwards selection.
+
+## c) Another approach is to simplify the random effect structure by excluding correlations. 
+##  Try out whether this would have solved the problem.
+
+m = lmer(RT ~ PrevType+  Frequency+ NativeLanguage+(PrevType+Frequency||Subject) + (PrevType+NativeLanguage|| Word), lexdec, REML=F)
+# Even with the exclusion of the correlation there are still convergence problems.
+
+#########################################################################
+### Exercise 2  Simulations and power
+#########################################################################
+
+## In the following we provide you with code for simulations. The goal of the exercise is for you to try out
+## the code and understand what it does.
+## Please always execute the code at least 5 times for each subquestion, to see how stable the results are 
+##  -- this is necessary because we are sampling the data randomly, so it could be that we sometimes get more or 
+##  less "lucky" draws. 
+
+
+n <- 200 # number of observations to be simulated
+predA <- rnorm(n, 80, 20)
+predB <- rnorm (n, 30, 30)
+interact <- 0.02*(predA*predB) 
+error <- rnorm (n, 0, 50)
+
+resp <- 32 + 0.02*predA - 2.4*predB + interact + error
+
+d <- data.frame(predA, predB, resp)
+
+## a) Write down what values you would hope for the model to estimate in the ideal case:
+##   i)  intercept= 32
+###!!! wrong:
+##   ii) predA= 80
+##   iii)predB= 30
+
+##   iv) predA:predB = 0.02
+
+m1<- lm(resp~predA*predB, data=d)
+summary(m1)  
+
+## b) Can the model recover the original model structure and estimate correct coefficients 
+##  for the predictors?
+
+# After executing the code several times we come to the conclusion that
+# the coefficients (slopes) are correctly estimated for predB and for the interaction but not for predA.
+# The estimated coefficients are very close but often the slope for predA has the wrong sign.
+# The intercept deviates from the original model by a lot (original model intercept: 32).
+
+# Following from this information we conclude that the model can't recover the original model structure.
+
+## c) What happens if you change the number of subjects? (specify the numbers you tried out)
+
+n <- 10000 # number of observations to be simulated
+predA <- rnorm(n, 80, 20)
+predB <- rnorm (n, 30, 30)
+interact <- 0.02*(predA*predB) 
+error <- rnorm (n, 0, 50)
+
+resp <- 32 + 0.02*predA - 2.4*predB + interact + error
+
+d <- data.frame(predA, predB, resp)
+
+m2<- lm(resp~predA*predB, data=d)
+summary(m2)  
+
+# The larger the number of subjects (n) the better our intercept and coefficient estimates.
+# We first tried it out with n = 1000 which improved the estimates.
+# Then we tried it with n = 10000 which had an even better improvement.
+# For both the intercept and the coefficients the estimates deviate far less and
+# are nearer to the ideal values.
+# For predA we also see that it is far less likely to have the wrong sign in front.
+
+## d) What happens if you change the variance of the error term? (specify the numbers you tried out)
+
+n <- 200 # number of observations to be simulated
+predA <- rnorm(n, 80, 20)
+predB <- rnorm (n, 30, 30)
+interact <- 0.02*(predA*predB) 
+error <- rnorm (n, 0, 0)
+
+resp <- 32 + 0.02*predA - 2.4*predB + interact + error
+
+d <- data.frame(predA, predB, resp)
+
+m2<- lm(resp~predA*predB, data=d)
+summary(m2)  
+
+# It seems like the smaller the variance of the error term the better the estimates and
+# thus the easier it is to recover the original model structure.
+# We first tried it out with 1 which improved the estimates.
+# For both the intercept and the coefficients the estimates deviate far less and
+# are nearer to the ideal values.
+# For predA we also see that it is far less likely to have the wrong sign in front.
+# Then we tried 100 which lead to far worse results than 1.
+# For both the intercept and the coefficients the estimates deviate far more and
+# are farther from the ideal values.
+# For predA we also see that it is far more likely to have the wrong sign in front.
+# If we set the variance of the error term to 0 it gives us a perfect fit proving that the choice of ideal values was right.
+
+## e) What happens if you change the effect sizes?
+
+###!!! wrong / not what we meant by change the effect sizes:
+
+# The formula for the effect size in multiple linear regression is R2 / (1 - R2).
+# To raise the effect size we need to increase the R2.
+# To lower the effect size we need to decrease the R2.
+
+# To increase R2 (raise effect size) we decrease the variance of the error term.
+# With low variance of the error term the model has better estimates and
+# thus it is easier to recover the original model structure.
+
+# To decrease R2 (decrease effect size) we increase the variance of the error term.
+# With high variance of the error term the model has worse estimates and
+# thus it is harder to recover the original model structure.
+
+##  Next we include the above code into a loop to calculate the power of the experiment 
+
+# number of simulated data sets
+sim = 1000
+n = 100
+# results matrix
+results = matrix(nrow=sim, ncol=4)
+colnames(results) <- c("Intercept", "predA", "predB", "interaction")
+for(i in c(1:sim)){
+  predA <- rnorm(n, 80, 20)
+  predB <- rnorm (n, 30, 30)
+  interact <- 0.02*(predA*predB) 
+  error <- rnorm (n, 0, 50)
+  resp <- 32 + predA - 2.4*predB + interact + error
+  d <- data.frame(predA, predB, resp)
+  m1<- lm(resp~predA*predB, data=d)
+  # store the resulting p-values in the results matrix
+  results[i,] = summary(m1)$coefficients[,4]
+}
+
+## f. We use the above code and the results matrix to calculate power. Recall that the power is 
+##  the probability of rejecting the Null hypothesis, given a specific effect size.
+##  We can approximate this by calculating the proportion of simulated datasets, 
+##  where the effect comes out significant, i.e. below 0.05. 
+##  Calculate the power based on the simulations for all three effects of interest 
+##  (i.e., predA, predB and the interaction) individually.
+
+library(dplyr)
+
+results_dataframe <- as.data.frame(results)
+
+predA <- results_dataframe %>%
+  filter(predA < 0.05)
+predA_prop <- nrow(predA) / 1000
+
+predB <- results_dataframe %>%
+  filter(predB < 0.05)
+predB_prop <- nrow(predB) / 1000
+
+Interact_AB <- results_dataframe %>%
+  filter(interaction < 0.05)
+Interact_AB_prop <- nrow(Interact_AB) / 1000
+
+predA_prop
+predB_prop
+Interact_AB_prop
+
+## g. How does power change when you decrease your alpha level to 0.01?
+
+results_dataframe <- as.data.frame(results)
+
+predA <- results_dataframe %>%
+  filter(predA < 0.01)
+predA_prop <- nrow(predA) / 1000
+
+predB <- results_dataframe %>%
+  filter(predB < 0.01)
+predB_prop <- nrow(predB) / 1000
+
+Interact_AB <- results_dataframe %>%
+  filter(interaction < 0.01)
+Interact_AB_prop <- nrow(Interact_AB) / 1000
+
+predA_prop 
+predB_prop 
+Interact_AB_prop
+
+# Power decreases for all effects of interest.
+
+## h. How does power change, when you decrease the number of participants in each simulated data 
+##  set to 80? (alpha-level = 0.05)
+
+# number of simulated data sets
+sim = 1000
+n = 80
+# results matrix
+results = matrix(nrow=sim, ncol=4)
+colnames(results) <- c("Intercept", "predA", "predB", "interaction")
+for(i in c(1:sim)){
+  predA <- rnorm(n, 80, 20)
+  predB <- rnorm (n, 30, 30)
+  interact <- 0.02*(predA*predB) 
+  error <- rnorm (n, 0, 50)
+  resp <- 32 + predA - 2.4*predB + interact + error
+  d <- data.frame(predA, predB, resp)
+  m1<- lm(resp~predA*predB, data=d)
+  # store the resulting p-values in the results matrix
+  results[i,] = summary(m1)$coefficients[,4]
+}
+
+results_dataframe <- as.data.frame(results)
+
+predA <- results_dataframe %>%
+  filter(predA < 0.05)
+predA_prop <- nrow(predA) / 1000
+
+predB <- results_dataframe %>%
+  filter(predB < 0.05)
+predB_prop <- nrow(predB) / 1000
+
+Interact_AB <- results_dataframe %>%
+  filter(interaction < 0.05)
+Interact_AB_prop <- nrow(Interact_AB) / 1000
+
+predA_prop 
+predB_prop 
+Interact_AB_prop 
+
+# The power decreases with the smaller sample size for all 3 effects of interest.
+
