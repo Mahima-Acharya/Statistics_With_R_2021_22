@@ -1,0 +1,268 @@
+### Stats with R Exercise sheet 5
+
+##########################
+#Correlation and Regression
+##########################
+
+
+## This exercise sheet contains the exercises that you will need to complete and 
+## submit by 23:55 on Sunday, December 5. Write the code below the questions. 
+## If you need to provide a written answer, comment this out using a hashtag (#). 
+## Submit your homework via cms
+## Please use the ggplot2 library for all graphs in this homework.
+
+
+## Please write below your (and your teammates') name, matriculation number. 
+## Name: Mark Sebastian Mikleu, George Daniel Mikleu, Mahima Mahabaleshwar Acharya
+## Matriculation number: 2580499, 2580498, 7003016
+## Team: 56
+
+###########################################################################################
+###########################################################################################
+
+library(languageR)
+library(ggplot2)
+library(dplyr)
+
+#######################
+### Exercise 1: Correlation
+#######################
+
+## a) We will again use lexdec from languageR. This week, we will look at the variables 
+##  RT, FreqSingular, Trial, Frequency, and Length. Create a dataset called data with just
+##  those variables
+
+data <- select(lexdec,c(RT,FreqSingular,Trial,Frequency,Length))
+
+## b) Take a look at the data frame.
+
+str(data)
+
+## c) Let's say you're interested in whether there is a linear relationship between 
+## Frequency and Length 
+## Take a look at the relationship between the frequency and length by 
+## means of a scatterplot (use the ggplot library for this).
+
+ggplot(data, aes(x = Length, y = Frequency)) +
+  geom_point()
+
+## d) Judging from the graph, do you think that word frequency and word length are 
+## in any way correlated with one another?
+
+# Yes, they are negatively correlated.
+# The larger the word length the smaller the frequency gets.
+
+## e) We are also interested in correlations between RT and all other variables in
+## data. Get the correlations between all variables in the data set using cor().
+## Tell R to only include complete pairs of observations. Is the correlation between
+## Frequency and Length like you expected?
+
+cor(data, use = "pairwise.complete.obs")
+
+# As expected the correlation between Frequency and Length is negative.
+# From the function we know the strength of the negative correlation is moderate.
+
+## f) What is the range of a correlation, what is the meaning of a correlation of 0,
+## 1, and -1 respectively?
+
+# The range of a correlation is between -1 and 1.
+# A correlation of 0 means that there is no correlation and thus 
+# the variables are completely independent of each other.
+# A correlation of 1 means that there is a perfect positive correlation.
+# We can visualize this by a line going from the left lower side to the right upper side.
+# A correlation of -1 means that there is a perfect negative correlation.
+# We can visualize this by a line going from the left upper side to the right lower side.
+
+## g) Going back to the correlation matrix obtained above, please describe the correlations
+##  between RT and the other variables in words.
+
+# RT FreqSingular:    negligible negative correlation
+# RT Trial:           negligible negative correlation
+# RT Frequency:       weak negative correlation
+# RT Length:          negligible positive correlation
+
+## h) Is the correlation between RT and FreqSingular significant? Use cor.test()
+
+cor.test(data$RT, data$FreqSingular)
+
+# The p-value is smaller than 0.05 and thus we reject the null hypothesis.
+# Following from this we know that there is a significant negative correlation
+# between RT and FreqSingular.
+
+## i) Calculate the Spearman rank correlation between RT and FreqSingular. 
+## What do you observe?
+
+cor(data$RT, data$FreqSingular, method = "spearman")
+
+# The correlation between the RT and FreqSingular is weakly negative.
+# The Spearman rank correlation is stronger than the Pearson correlation.  
+
+## j) To get a better overview, we will create a plot between FreqSingular and 
+## the mean RT per FreqSingular level.  
+## Use group_by() and summarize() to obtain mean RTs by FreqSingular.
+## Make a scatter plot between the two variables of the resulting data set.
+
+a <- data %>%
+  group_by(FreqSingular) %>%
+  summarize(mean = mean(RT))
+
+ggplot(a, aes(x = FreqSingular, y = mean)) +
+  geom_point()
+
+## k) Looking at the graph, why do you think Spearman's rho is better suited than the Pearson 
+## correlation to describe the relationship between the two variables?
+###!!! slightly imprecise:
+# As the value of the mean decreases, the value of FreqSingular increases.
+# The change in the variables aren't constant and thus the use of ranks
+# like in the Spearman rank correlation is better than the Pearson Correlation.
+
+
+## l) Calculate Kendall's tau for the same relationship. 
+cor(data$RT, data$FreqSingular, method = "kendall")
+
+## m) Is there any reason to prefer this correlation measure in the current context? 
+##  In general, in what contexts would you use Kendall's tau?
+
+# No, there isn't.
+# Kendall's tau is used in the context of ordinal data.
+
+################################
+### Exercise 2: Regression
+################################
+
+
+## a) Read in the data set lexicalDecision2.csv provided on cms and turn the variable Word 
+##  into a factor. This data set is similar to the one used above in that it looks at lexical decision 
+##  times for different words with the explanatory variables Frequency, Length and SynsetCount.
+
+
+lexicalDecision2 <- read.csv("lexicalDecision2.csv")
+lexicalDecision2 <- lexicalDecision2 %>%
+  mutate(Word = factor(Word))
+
+
+## b) First, we will investigate the relationship between meanRT and Length, which gives the length 
+##  of the word in letters. Make a scatter plot of meanRT and Length (as always: ggplot). You can use
+##  geom_jitter() to avoid overplotting
+
+ggplot(lexicalDecision2, aes(x = Length, y = meanRT)) +
+  geom_jitter()
+
+## c) Run a regression model with meanRT and Length and look at the summary.
+## General form: 
+## "modelname <- lm(outcome ~ predictor, data = dataFrame, na.action = an action)"
+## "summary(modelname)"
+
+model1 <- lm(meanRT ~ Length, data = lexicalDecision2)
+model1
+summary(model1)
+
+## d) Interpret the model from c. What do intercept and the coefficient of Length tell you?
+
+# The p-value is smaller than 0.05 so the model is statistically significant.
+
+# The intercept tells us from where on the y axis we start the regression line (when x = 0).
+# So in this case if the word length is 0 than we have a meanRT of 6.27088.
+
+# The Length here is the slope which tells us how steep the line is.
+# If the word length increases by 1 the meanRT increases by 0.01938.
+
+## e) What about the model fit: What proportion of the total variance is explained by your model?
+
+# Multiple R-squared:  0.1773
+# The proportion of the total variance explained by my model is  0.1773 (17.73 %).
+
+## f) Now let's turn to the relationship between meanRT and Frequency. Run the regression and 
+## interpret.
+
+model2 <- lm(meanRT ~ Frequency, data = lexicalDecision2)
+model2
+summary(model2)
+
+# The p-value is smaller than 0.05 so the model is statistically significant.
+# Intercept:  If the word frequency is 0 than we have a meanRT of 6.54711.
+# Slope:      If the word frequency increases by 1 the meanRT decreases by 0.03418.
+
+## g) Plot meanRT by Frequency and add a regression line to your plot
+
+ggplot(lexicalDecision2, aes(x = Frequency, y = meanRT)) +
+  geom_jitter() +
+  geom_abline(intercept = 6.54711, slope = -0.03418, color = "red")
+
+## h) Redo the plot, but instead of points, plot the Word value.
+## Do you think there are any "bad" outliers, i.e. highly influential data points in your data set?
+
+ggplot(lexicalDecision2, aes(x = Frequency, y = meanRT)) +
+  geom_text(aes(label = Word)) +
+  geom_abline(intercept = 6.54711, slope = -0.03418, color = "red")
+# vulture and horse seem to have high leverage. 
+# The only highly influencial outlier however seems to be egplant.
+
+## i) Rerun the model excluding the data point for the word "egplant". Compare the results.
+
+lexicalDecision3 <- lexicalDecision2 %>%
+  filter(!(Word == "egplant"))
+
+model3 <- lm(meanRT ~ Frequency, data = lexicalDecision3)
+model3
+summary(model3)
+  
+ggplot(lexicalDecision3, aes(x = Frequency, y = meanRT)) +
+  geom_text(aes(label = Word)) +
+  geom_abline(intercept = 6.59562, slope = -0.04368, color = "red")
+
+# The R squared value is larger and thus the model has a better fit.
+# Visually we can see that by the line that fits the data better.
+
+
+## j) Given the difference between the two models and the peculiarities that you observe for this 
+## data point, would you exclude this data point from further analysis?
+
+# If we look at the two summaries we see that the min and max residuals for the model
+# that excluded the word is lower and the R-Squared is a lot larger too.
+# Following from this we can say that it would be a good decision to remove the word.
+
+###################################
+### Exercise 3: Multiple Regression
+###################################
+
+## We will use the same data set as in 2. This time, we will look at the effect of Frequency and Length
+## on meanRT simultaneously. 
+
+## a) Run a multiple regression model with Frequency and Length as predictors
+## General form: 
+## "modelname <- lm(outcome ~ predictor1+predictor2+.., data = dataFrame, na.action = an action)"
+## "summary(modelname)"
+
+model4 <- lm(meanRT ~ Frequency + Length, data = lexicalDecision2)
+model4
+summary(model4)
+
+## b) Interpret the model: what do intercept and the 2 coefficients tell you? What about significance?
+
+# The p-value is smaller than 0.05 following from this we know that our model is significant.
+# The proportion of the total variance explained by my model is 0.3328.
+# Intercept: If the word frequency and word length is 0 then we have a meanRT of 6.45297.
+# If the word frequency increases by 1 the meanRT decreases by 0.02780.
+# If the word length increases by 1 the meanRT increases by 0.01081.
+
+## c) Compare to the model in 2c (only including Length), has the model fit improved? How about
+## the model in 2f (only including Frequency)?
+
+summary(model1)
+summary(model2)
+summary(model4)
+
+# The current model has a larger R squared (0.3328) than the the model in 2c (0.1773)
+# and the model in 2f (0.2877) thus the fit of the model is better.
+
+## d) Using the model from 3 a: What is the predicted meanRT for the word "giraffe", which has a Frequency 
+## of 3.33. Calculate "by hand", i.e. do not use predict() and show your calculation.
+
+# Given: frequency: 3.33, length: 7
+# intercept: 6.45297, slope1: -0.02780, slope2: 0.01081
+# y = intercept + slope1 * Frequency + slope2 * Length
+#   = 6.45297 + (-0.02780) * 3.33 + 0.01081 * 7
+#   = 6.536066
+
+
