@@ -1,0 +1,185 @@
+### Stats with R Exercise sheet 7
+
+##########################
+#Week 13: Bayesian statistics 2
+##########################
+
+## This exercise sheet contains the exercises that you will need to complete and 
+## submit by 23:55 on Sunday, February 6. Write the code below the questions. 
+## If you need to provide a written answer, comment this out using a hashtag (#). 
+## Submit your homework via cms
+
+## Please write below your (and your teammates) name, matriculation number. 
+## #team: 56
+## Name: Mark Sebastian Mikleu, George Daniel Mikleu, Mahima Mahabaleshwar Acharya
+## Matriculation number: 2580499, 2580498, 7003016
+
+###############################################################################
+###############################################################################
+
+# The following line of code clears your workspace.
+
+rm(list = ls())
+
+
+########################################
+### Exercise 1
+########################################
+
+
+##  We will again be using the lexdec dataset from library languageR. 
+##  In sheet 6, we ran a multiple regression model, which we will now repeat as a Bayesian 
+##  analysis using the package brms.
+
+## a) Load the dataset lexdec from package languageR and store it in a variable called data
+
+library(languageR)
+
+data <- lexdec
+
+
+## b) Load the package brms
+
+#install.packages("brms")
+library(brms)
+
+## c) Fit a (frequentist) linear model of RT including Frequency and PrevType as predictors, store it in lm1
+lm1 <- lm(RT ~ Frequency + PrevType, data=data)
+
+## d) Fit the same model as a Bayesian regression using the function brm() and using only defaults (you don't need
+##  to specify priors or fitting parameters like chains and iterations). Store it in bm1
+bm1 <- brm(RT ~ Frequency + PrevType, data=data)
+
+## e) Look at the summaries of bm1 and lm1
+summary(lm1)
+summary(bm1)
+
+## f) How do the parameter estimates compare?
+
+# The parameter estimates seem to be the same for both bm1 and lm1, though they are given less precise for
+# bm1 (rounded to only the second decimal place) than for lm1 (rounded to the fifth decimal place).
+# The same thing seems to be the case for the estimation error, the bayesian equivalent to the standard
+# error. They too seem to have the same values, but are rounded in the summary of bm1 to only the second
+# decimal place.
+
+## g) store the posterior samples of b_Frequency in the variable ps_freq. Use the function as_draws_df()
+ps_freq <- as_draws_df(bm1)$b_Frequency
+ps_freq
+
+## h) Your colleague claims that the effect of frequency has to be smaller (meaning more negative) than -0.03.
+##  What is the probability of the frequency effect being more negative than -0.03 given your posterior samples?
+##  Do you agree with your colleague?
+
+sum(ps_freq < -0.03) / length(ps_freq)
+
+# Given that more than 99% of the posterior samples are smaller than -0.03,
+# I have to agree with the colleague.
+
+## i) Derive 95% and 80% credible intervals from ps_freq. Compare to the results above.
+ci_bm1_95 <- posterior_interval(bm1, prob = 0.95)
+ci_bm1_95[2, ] # b_Frequency
+
+ci_bm1_80 <- posterior_interval(bm1, prob = 0.80)
+ci_bm1_80[2, ] # b_Frequency
+
+# proportion of values in 95% interval
+sum(ps_freq>ci_bm1_95[2, 1] & ps_freq<ci_bm1_95[2, 2]) / length(ps_freq)
+
+# proportion of values in 95% interval
+sum(ps_freq>ci_bm1_80[2, 1] & ps_freq<ci_bm1_80[2, 2]) / length(ps_freq)
+
+# 95% of the data points can be found in the 95% credible interval and 80% of the data points can be found
+# in the 80% credible interval.
+# The lower edge of both the 95% and 80% credible interval are smaller than -0.03.
+
+## j) What is the meaning of a credible interval compared to the confidence interval in the frequentist's approach?
+
+###!!! wrong:
+# The confidence interval in the frequentist's approach describes the probability that the interval contains
+# the true value of the parameter. So for a 95% confidence interval, if we repeated an experiment for example a
+# 100 times then the true value of the parameter would ideally be contained 95% of the times.
+
+###!!! this is correct:
+# The credible interval in the bayesian's approach on the other hand describes the probability of the true value of
+# the parameter lying inside an interval.
+
+## k) Plot the model using the default function, this will give you the posteriors of the model parameters
+##   as well as the trace plot, which give you an indication of the convergence of your model. The trace 
+##   plot is supposed to look like a "fat hairy caterpillar", i.e. the different chains should not be 
+##   separated in any part of the plot and there should not be a general pattern. Is this the case?
+plot(bm1)
+
+# Yes, that is the case.
+
+## l) We want the model to run quicker. Change the settings such that each chain only has 180 iterations with 1/4 of
+# them as warmup. Store the result in bm2 and look at summary and trace plots. Use the provided seed to be able to 
+# better compare your results (or try a different one, but provide it together with your answer!)
+set.seed(1111)
+
+bm2 <- brm(RT ~ Frequency + PrevType, data=data, iter = 180, warmup = 45)
+
+summary(bm2)
+plot(bm2)
+
+## m) Do you think reducing the iterations was a good idea? Give reasons!
+
+# No, I don't think that reducing the number of iterations was a good idea (at least not with this amount).
+# 
+# As can be seen in the summary, parts of the model weren't capable of converging and there were a total
+# of 21 divergent transitions after the warmup iterations.
+# 
+# The different trace plots show converging problems as well.
+# Especially chain 1 shows an untypical behavior. Here different from the first model, where it
+# swiftly leaves low probability mass areas and samples mainly from the areas with high probability mass,
+# it seems that it samples a significantly higher portion from low probability mass areas compared to the
+# other chains, before switching locations.
+# Additionally, with the exception of the sigma trace plot, it seems to have trouble converging with the
+# other chains after the warm-up iterations. This becomes especially obvious in b_PrevTypeword trace.
+# In it there is a significant discrepancy between the first and all other chains in an interval between around
+# iterations 50 and 70.
+
+## n) Another colleague of yours said 2 months ago to you that the effect of frequency is most likely at -0.01 +-0.005
+##  Use these numbers for a normal prior of Frequency (with 0.005 as sd). Assign the model to bm3. 
+
+prior <- get_prior(RT ~ Frequency + PrevType, data=data)
+prior$prior
+prior$prior[2] <- "normal(-0.01,0.005)"
+
+bm3 <- brm(RT ~ Frequency + PrevType, data=data, prior = prior)
+
+summary(bm3)
+plot(bm3)
+
+## o) How did the estimate and credible interval of frequency change?
+
+ps_freq3 <- as_draws_df(bm3)$b_Frequency
+ps_freq3
+
+ci_bm3_95 <- posterior_interval(bm3, prob = 0.95)
+ci_bm3_95[2, ] # b_Frequency
+
+ci_bm3_80 <- posterior_interval(bm3, prob = 0.80)
+ci_bm3_80[2, ] # b_Frequency
+
+# proportion of values in 95% interval
+sum(ps_freq3>ci_bm3_95[2, 1] & ps_freq3<ci_bm3_95[2, 2]) / length(ps_freq3)
+
+# proportion of values in 95% interval
+sum(ps_freq3>ci_bm3_80[2, 1] & ps_freq3<ci_bm3_80[2, 2]) / length(ps_freq3)
+###!!! this is always the case, by definition:
+# As before 95% of the data points can be found in the 95% credible interval and 80% of the data points
+# can be found in the 80% credible interval.
+# 
+# However both the estimates and the credible intervals changed considerably compared to before.
+# Both the 80% and 95% credible intervals shifted to the right (became bigger). The lower bound changed
+# from -0.05194923 to -0.03496554 for the 95% and from -0.04906713 to -0.03271302 for the 80% credible interval.
+# The upper bound changed from -0.03435007 to -0.02167355 for the 95% and from -0.03728255 to -0.02385054 for
+# the 80% credible interval.
+# 
+# For the posterior estimate the value increased from -0.04 to -0.03.
+
+## p) What class of priors does the above one belong to? 
+
+# It belongs to the informative priors class, since it is a normal distribution with
+# a very small standard deviation (little variability and strong constriction of the posterior).
+
